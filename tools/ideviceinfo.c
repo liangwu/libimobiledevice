@@ -39,6 +39,8 @@
 #include <libimobiledevice/lockdown.h>
 #include "common/utils.h"
 
+#include <lusb0_usb.h>
+
 #define FORMAT_KEY_VALUE 1
 #define FORMAT_XML 2
 
@@ -111,6 +113,7 @@ static void print_usage(int argc, char **argv, int is_error)
 		"  -a, --assistive \n" \
 		"  -r, --reset \n" \
 		"  -g, --get \n" \
+		"  -f, --find driver \n" \
 		"\n"
 	);
 	fprintf(is_error ? stderr : stdout, "Known domains are:\n\n");
@@ -156,6 +159,7 @@ int main(int argc, char *argv[])
 		{ "assistive", no_argument, NULL, 'a' },
 		{ "reset", no_argument, NULL, 'r' },
 		{ "get", no_argument, NULL, 'g' },
+		{ "find", no_argument, NULL, 'f' },
 		{ NULL, 0, NULL, 0}
 	};
 
@@ -163,7 +167,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
-	while ((c = getopt_long(argc, argv, "dhu:nq:k:sxvarg", longopts, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "dhu:nq:k:sxvargf", longopts, NULL)) != -1) {
 		switch (c) {
 		case 'd':
 			idevice_set_debug_level(1);
@@ -219,6 +223,15 @@ int main(int argc, char *argv[])
 			assistive_func = 1;
 			assistive_enable = 10;
 			break;
+		case 'f':
+			usb_init();
+			struct usb_version* version = usb_get_version();
+			if (version->driver.major != -1) {
+				printf("TRUE");
+			} else {
+				printf("FALSE");
+			}
+			return 0;
 		default:
 			print_usage(argc, argv, 1);
 			return 2;
