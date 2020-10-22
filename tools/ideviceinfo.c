@@ -108,6 +108,9 @@ static void print_usage(int argc, char **argv, int is_error)
 		"  -h, --help         prints usage information\n" \
 		"  -d, --debug        enable communication debugging\n" \
 		"  -v, --version      prints version information\n" \
+		"  -a, --assistive \n" \
+		"  -r, --reset \n" \
+		"  -g, --get \n" \
 		"\n"
 	);
 	fprintf(is_error ? stderr : stdout, "Known domains are:\n\n");
@@ -131,6 +134,8 @@ int main(int argc, char *argv[])
 	int format = FORMAT_KEY_VALUE;
 	const char* udid = NULL;
 	int use_network = 0;
+	int assistive_func = 0;
+	int assistive_enable = 0;
 	const char *domain = NULL;
 	const char *key = NULL;
 	char *xml_doc = NULL;
@@ -148,6 +153,9 @@ int main(int argc, char *argv[])
 		{ "simple", no_argument, NULL, 's' },
 		{ "xml", no_argument, NULL, 'x' },
 		{ "version", no_argument, NULL, 'v' },
+		{ "assistive", no_argument, NULL, 'a' },
+		{ "reset", no_argument, NULL, 'r' },
+		{ "get", no_argument, NULL, 'g' },
 		{ NULL, 0, NULL, 0}
 	};
 
@@ -155,7 +163,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
-	while ((c = getopt_long(argc, argv, "dhu:nq:k:sxv", longopts, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "dhu:nq:k:sxvarg", longopts, NULL)) != -1) {
 		switch (c) {
 		case 'd':
 			idevice_set_debug_level(1);
@@ -199,6 +207,18 @@ int main(int argc, char *argv[])
 		case 'v':
 			printf("%s %s\n", TOOL_NAME, PACKAGE_VERSION);
 			return 0;
+		case 'a':
+			assistive_func = 1;
+			assistive_enable = 1;
+			break;
+		case 'r':
+			assistive_func = 1;
+			assistive_enable = 0;
+			break;
+		case 'g':
+			assistive_func = 1;
+			assistive_enable = 10;
+			break;
 		default:
 			print_usage(argc, argv, 1);
 			return 2;
@@ -218,16 +238,44 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	if (assistive_func == 1) {
+		ldret = lockdownd_client_new_with_handshake(device, &client, "oa");
+		if (ldret != LOCKDOWN_E_SUCCESS) {
+			printf("ERROR: Could not connect to lockdownd: %s (%d)\n", lockdownd_strerror(ldret), ldret);
+			idevice_free(device);
+			return -1;
+		}
+
+		if (assistive_enable == 10) {
+			ldret = lockdownd_get_value(client, "com.apple.Accessibility", "AssistiveTouchEnabledByiTunes", &node);
+			if (ldret == LOCKDOWN_E_SUCCESS) {
+				if (node) {
+					plist_print_to_stream(node, stdout);
+					plist_free(node);
+					node = NULL;
+				}
+			}
+		}
+		else {
+			node = plist_new_bool(assistive_enable != 0);
+			ldret = lockdownd_set_value(client, "com.apple.Accessibility", "AssistiveTouchEnabledByiTunes", node);
+			if (ldret == LOCKDOWN_E_SUCCESS) {
+				printf("1");
+			}
+		}
+
+		lockdownd_client_free(client);
+		idevice_free(device);
+
+		return 0;
+	}
+
 	if (LOCKDOWN_E_SUCCESS != (ldret = simple ?
 			lockdownd_client_new(device, &client, TOOL_NAME):
 			lockdownd_client_new_with_handshake(device, &client, TOOL_NAME))) {
 		fprintf(stderr, "ERROR: Could not connect to lockdownd: %s (%d)\n", lockdownd_strerror(ldret), ldret);
 		idevice_free(device);
 		return -1;
-	}
-
-	if (domain && !is_domain_known(domain)) {
-		fprintf(stderr, "WARNING: Sending query with unknown domain \"%s\".\n", domain);
 	}
 
 	/* run query and output information */
