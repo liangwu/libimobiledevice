@@ -92,7 +92,12 @@ static int is_domain_known(const char *domain)
 	return 0;
 }
 
-static void find_driver(int pid) {
+static void find_driver(int pid, const char* udid) {
+	if (!udid) {
+		printf("FALSE");
+		return;
+	}
+
 	usb_init();
 
 	const struct usb_version* version = usb_get_version();
@@ -122,15 +127,24 @@ static void find_driver(int pid) {
 			usb_dev_handle *handle = usb_open(dev);
 
 			if (handle) {
+				boolean result = FALSE;
+				char dev_serial[40];
+				int ret = usb_get_string_simple(handle, dev->descriptor.iSerialNumber, dev_serial, 40);
+				if (ret) {
+					if (strcmp(udid, dev_serial) == 0) {
+						result = TRUE;
+					}
+				}
 				usb_close(handle);
-				printf("TRUE");
+
+				if (result) {
+					printf("TRUE");
+					return;
+				}
 			}
-			else {
-				printf("FALSE");
-			}
-			return;
 		}
 	}
+	
 	printf("FALSE");
 }
 
@@ -271,7 +285,7 @@ int main(int argc, char *argv[])
 			if (!*optarg) {
 				return 0;
 			}
-			find_driver(atoi(optarg));
+			find_driver(atoi(optarg), udid);
 			return 0;
 		default:
 			print_usage(argc, argv, 1);
