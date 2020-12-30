@@ -44,6 +44,8 @@
 #define FORMAT_KEY_VALUE 1
 #define FORMAT_XML 2
 
+#define VID_APPLE 0x5ac
+
 static const char *domains[] = {
 	"com.apple.disk_usage",
 	"com.apple.disk_usage.factory",
@@ -88,6 +90,48 @@ static int is_domain_known(const char *domain)
 		}
 	}
 	return 0;
+}
+
+static void find_driver(int pid) {
+	usb_init();
+
+	const struct usb_version* version = usb_get_version();
+	if (version->driver.major == -1) {
+		printf("FALSE");
+		return;
+	}
+
+	usb_find_busses();
+	usb_find_devices();
+
+	struct usb_bus *bus;
+	struct usb_device *dev;
+
+	bus = usb_get_busses();
+
+	for (bus; bus; bus = bus->next)
+	{
+		for (dev = bus->devices; dev; dev = dev->next)
+		{
+			if (dev->descriptor.idVendor != VID_APPLE
+				|| dev->descriptor.idProduct != pid)
+			{
+				continue;
+			}
+
+			usb_dev_handle *handle = usb_open(dev);
+
+			if (handle) {
+				usb_close(handle);
+				printf("TRUE");
+			}
+			else {
+				printf("FALSE");
+			}
+			return;
+		}
+	}
+	printf("FALSE");
 }
 
 static void print_usage(int argc, char **argv, int is_error)
@@ -159,7 +203,7 @@ int main(int argc, char *argv[])
 		{ "assistive", no_argument, NULL, 'a' },
 		{ "reset", no_argument, NULL, 'r' },
 		{ "get", no_argument, NULL, 'g' },
-		{ "find", no_argument, NULL, 'f' },
+		{ "find", required_argument, NULL, 'f' },
 		{ NULL, 0, NULL, 0}
 	};
 
@@ -167,7 +211,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
-	while ((c = getopt_long(argc, argv, "dhu:nq:k:sxvargf", longopts, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "dhu:nq:k:sxvargf:", longopts, NULL)) != -1) {
 		switch (c) {
 		case 'd':
 			idevice_set_debug_level(1);
@@ -224,13 +268,10 @@ int main(int argc, char *argv[])
 			assistive_enable = 10;
 			break;
 		case 'f':
-			usb_init();
-			struct usb_version* version = usb_get_version();
-			if (version->driver.major != -1) {
-				printf("TRUE");
-			} else {
-				printf("FALSE");
+			if (!*optarg) {
+				return 0;
 			}
+			find_driver(atoi(optarg));
 			return 0;
 		default:
 			print_usage(argc, argv, 1);
