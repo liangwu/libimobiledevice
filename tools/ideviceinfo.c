@@ -97,6 +97,7 @@ static void find_driver(int pid, const char* udid) {
 		printf("FALSE");
 		return;
 	}
+	//printf("find_driver pid:%d udid:%s \n", pid, udid);
 
 	usb_init();
 
@@ -128,9 +129,10 @@ static void find_driver(int pid, const char* udid) {
 
 			if (handle) {
 				boolean result = FALSE;
-				char dev_serial[40];
-				int ret = usb_get_string_simple(handle, dev->descriptor.iSerialNumber, dev_serial, 40);
+				char dev_serial[100];
+				int ret = usb_get_string_simple(handle, dev->descriptor.iSerialNumber, dev_serial, 100);
 				if (ret) {
+					//printf("find_driver dev_serial:%s \n", dev_serial);
 					if (strcmp(udid, dev_serial) == 0) {
 						result = TRUE;
 					}
